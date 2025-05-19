@@ -7,9 +7,35 @@ import requests
 from difflib import SequenceMatcher
 from joblib import load
 import pickle as pkl
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 classifier=load(r'linear_model.pkl')
 vectorize=load(r'vectorizer.pkl')
+
+# Start browser
+'''driver = webdriver.Chrome()
+driver.get("https://www.geo.tv/category/geo-fact-check")
+
+
+# Scroll to bottom to trigger JS to load more content
+last_height = driver.execute_script("return document.body.scrollHeight")
+
+while True:
+    try:
+        load_button = driver.find_element(By.XPATH, "//button[contains(text(),'Load More')]")
+        load_button.click()
+        time.sleep(5)
+    except:
+        break
+
+# Get full rendered HTML
+html = driver.page_source
+'''
 
 def similarity(a,b):
   return SequenceMatcher(None,a.lower(),b.lower()).ratio()
@@ -36,16 +62,19 @@ def check_fact(news):
   url = "https://www.geo.tv/category/geo-fact-check"
   response = requests.get(url)
   soup = BeautifulSoup(response.text, 'html.parser')
-  articles = soup.find_all("div", class_ = "listing")
+  articles = soup.find_all("div",class_ = "col-sm-6 col-lg-4")
+  print(len(articles))
   matches = []
 
   for article in articles:
     try:
-      a_tag = article.find("a")
-      title = a_tag.text.strip()
-      href = "https://www.geo.tv" + a_tag['href']
+      a_tag = article.find(class_="text-body")
+      title = a_tag.find("img")
+      title=title['alt']
+      
+      href = a_tag['href']
       score = similarity(news, title)
-      if score > 0.2:
+      if score > 0.5:
         matches.append((title, href, score))
     except:
       continue
@@ -68,11 +97,11 @@ def prediction_func(news,lr_model,vect):
   matches = check_fact(news)
   if matches:
     for title, url, score in matches:
-      print(f"Match (Score {score:.2f}): {title} — {url}")
+      print(f"Match (Score {score:.2f}):\n {title}\n {url}")
   else:
     print("No matching articles found on Geo Fact Check.")
 
 
 print("Enter the news to be checked: ")
-news = str("Viral 'Pakistani Pilot' photo is actually from Turkey")
+news = str("document claims radiation leak in pakistan")
 prediction_func(news,classifier,vectorize)

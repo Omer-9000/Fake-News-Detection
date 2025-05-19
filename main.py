@@ -48,6 +48,8 @@ vectorization = TfidfVectorizer()
 xv_train = vectorization.fit_transform(x_train)
 xv_test = vectorization.transform(x_test)
 
+print(xv_train.shape)
+
 dump(vectorization,"vectorizer.pkl")
 
 LR = LogisticRegression()
