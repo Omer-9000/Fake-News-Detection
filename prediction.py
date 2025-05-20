@@ -13,6 +13,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+import time
 
 classifier=load(r'linear_model.pkl')
 vectorize=load(r'vectorizer.pkl')
@@ -37,6 +39,22 @@ while True:
 html = driver.page_source
 '''
 
+
+driver = webdriver.Chrome()
+driver.get("https://www.geo.tv/category/geo-fact-check")
+wait = WebDriverWait(driver, 10)
+load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
+
+while load_more_button:
+  ActionChains(driver).move_to_element(load_more_button).perform()
+  load_more_button.click()
+  time.sleep(1.5)
+  try:
+    load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
+  except:
+    break
+
+html_source = driver.page_source
 def similarity(a,b):
   return SequenceMatcher(None,a.lower(),b.lower()).ratio()
 
@@ -61,7 +79,7 @@ def wordopt(text):
 def check_fact(news):
   url = "https://www.geo.tv/category/geo-fact-check"
   response = requests.get(url)
-  soup = BeautifulSoup(response.text, 'html.parser')
+  soup = BeautifulSoup(html_source, 'html.parser')
   articles = soup.find_all("div",class_ = "col-sm-6 col-lg-4")
   print(len(articles))
   matches = []
@@ -103,5 +121,5 @@ def prediction_func(news,lr_model,vect):
 
 
 print("Enter the news to be checked: ")
-news = str("document claims radiation leak in pakistan")
+news = str("Video of child tortured is authentic; suspect arrested")
 prediction_func(news,classifier,vectorize)

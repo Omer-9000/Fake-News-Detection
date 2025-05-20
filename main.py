@@ -17,7 +17,7 @@ from joblib import dump
 
 
 #Dataset
-data=pd.read_csv(r'Fake-News-Detection\news_dataset.csv')
+data=pd.read_csv('news_dataset.csv')
 data.dropna(inplace=True)
 
 print(data.shape)
