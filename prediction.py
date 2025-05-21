@@ -1,125 +1,81 @@
 import pandas as pd
 import numpy as np
+import csv
 import re
 import string
 from bs4 import BeautifulSoup
 import requests
-from difflib import SequenceMatcher
 from joblib import load
 import pickle as pkl
 import time
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-import time
-
-classifier=load(r'linear_model.pkl')
-vectorize=load(r'vectorizer.pkl')
-
-# Start browser
-'''driver = webdriver.Chrome()
-driver.get("https://www.geo.tv/category/geo-fact-check")
+from sklearn.metrics.pairwise import cosine_similarity
 
 
-# Scroll to bottom to trigger JS to load more content
-last_height = driver.execute_script("return document.body.scrollHeight")
+#Loading classifier
+classifier=load(r'Fake-News-Detection\classifier_mod.pkl')
 
-while True:
-    try:
-        load_button = driver.find_element(By.XPATH, "//button[contains(text(),'Load More')]")
-        load_button.click()
-        time.sleep(5)
-    except:
-        break
+#Load geo fact check articles embeddings
+with open(r"Fake-News-Detection\glove_title_vectors.pkl", "rb") as f:
+    titles, links, title_vectors = pkl.load(f)
 
-# Get full rendered HTML
-html = driver.page_source
-'''
+#Load Glove
+with open(r"Fake-News-Detection\glove_100d.pkl", "rb") as f:
+    glove = pkl.load(f)
 
+#Embeddings function
+def sentence_embedding(sentence, data_dit,dim=100):
+  words = sentence.lower().split()
+  word_embeddings = []
+  for word in words:
+    if word in data_dit:
+      word_embeddings.append(data_dit[word])
+  if not word_embeddings:
+    return np.zeros(dim)
 
-driver = webdriver.Chrome()
-driver.get("https://www.geo.tv/category/geo-fact-check")
-wait = WebDriverWait(driver, 10)
-load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
+  sentence_embed = np.mean(word_embeddings, axis=0)
+  return sentence_embed
 
-while load_more_button:
-  ActionChains(driver).move_to_element(load_more_button).perform()
-  load_more_button.click()
-  time.sleep(1.5)
-  try:
-    load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
-  except:
-    break
-
-html_source = driver.page_source
-def similarity(a,b):
-  return SequenceMatcher(None,a.lower(),b.lower()).ratio()
-
+#Labels
 def output_label(n):
   if n == 0:
     return 'Fake News'
   elif n == 1:
     return 'Not Fake News'
   
+#Preprocessing function
 def wordopt(text):
   text = str(text).lower()
-  text = re.sub('\[.*?/]','',text)
-  text = re.sub("\\W"," ",text)
-  text = re.sub('https?://\S+|www\.\S+','',text)
-  text = re.sub('<.*?>+','',text)
-  text = re.sub('[%s]'%re.escape(string.punctuation),'',text)
-  text = re.sub('\n','',text)
-  text = re.sub('\w*\d\w*','',text)
+  text = re.sub(r'\[.*?\]', '', text)
+  text = re.sub(r'https?://\S+|www\.\S+', '', text)
+  text = re.sub(r'<.*?>', '', text)
+  text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text) 
+  text = re.sub(r'\n', ' ', text) 
+  text = re.sub(r'\w*\d\w*', '', text) 
+  text = re.sub(r'\s+', ' ', text).strip() 
   return text
-  
+
 #WEB SCRAPING
-def check_fact(news):
-  url = "https://www.geo.tv/category/geo-fact-check"
-  response = requests.get(url)
-  soup = BeautifulSoup(html_source, 'html.parser')
-  articles = soup.find_all("div",class_ = "col-sm-6 col-lg-4")
-  print(len(articles))
-  matches = []
+def check_fact(query):
+    # Compare with cosine similarity
+    scores = cosine_similarity(query, title_vectors)[0]
+    top_indices = np.argsort(scores)[::-1][:3]
 
-  for article in articles:
-    try:
-      a_tag = article.find(class_="text-body")
-      title = a_tag.find("img")
-      title=title['alt']
-      
-      href = a_tag['href']
-      score = similarity(news, title)
-      if score > 0.5:
-        matches.append((title, href, score))
-    except:
-      continue
-  matches = sorted(matches, reverse = True)
-  return matches[:3]
-
+    # Show results
+    for idx in top_indices:
+        print(f"{scores[idx]:.2f} | {titles[idx]} → {links[idx]}")
 
 #FUNCTION FOR PREDICTION
-
-def prediction_func(news,lr_model,vect):
-  testing_news = {"text": [news]}
-  new_def_test = pd.DataFrame(testing_news)
-  new_def_test["text"] = new_def_test['text'].apply(wordopt)
-  new_x_test = new_def_test["text"]
-  new_xv_test = vect.transform(new_x_test)
-  pred_LR = lr_model.predict(new_xv_test)
-  print("\nLR Prediction: {}".format(output_label(pred_LR[0])))
+def prediction_func(news,lr_model):
+  query = wordopt(news)
+  query_vec = sentence_embedding(query, glove)
+  query_vec = np.array(query_vec).reshape(1, -1)
+  query_vec=query_vec.tolist()
+  pred_LR = lr_model.predict(query_vec)
+  print("LR Prediction: {}".format(output_label(pred_LR[0])))
   
   print("\nChecking Geo Fact Check matches...")
-  matches = check_fact(news)
-  if matches:
-    for title, url, score in matches:
-      print(f"Match (Score {score:.2f}):\n {title}\n {url}")
-  else:
-    print("No matching articles found on Geo Fact Check.")
-
+  matches = check_fact(query_vec)
 
 print("Enter the news to be checked: ")
-news = str("Video of child tortured is authentic; suspect arrested")
-prediction_func(news,classifier,vectorize)
+news = str("Viral news of Pakistani pilot in indian custody spreading all over the country.")
+prediction_func(news,classifier)
