@@ -9,38 +9,29 @@ from joblib import load
 import pickle as pkl
 import time
 from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 
 #Loading classifier
-classifier=load(r'Fake-News-Detection\classifier_mod.pkl')
+classifier=load(r'Fake-News-Detection\classifier_log.pkl')
+
+#Loading scaler
+scale=load(r'Fake-News-Detection\scaler.pkl')
 
 #Load geo fact check articles embeddings
-with open(r"Fake-News-Detection\glove_title_vectors.pkl", "rb") as f:
+with open(r"Fake-News-Detection\news_vectors.pkl", "rb") as f:
     titles, links, title_vectors = pkl.load(f)
 
-#Load Glove
-with open(r"Fake-News-Detection\glove_100d.pkl", "rb") as f:
-    glove = pkl.load(f)
 
-#Embeddings function
-def sentence_embedding(sentence, data_dit,dim=100):
-  words = sentence.lower().split()
-  word_embeddings = []
-  for word in words:
-    if word in data_dit:
-      word_embeddings.append(data_dit[word])
-  if not word_embeddings:
-    return np.zeros(dim)
+model = SentenceTransformer('Fake-News-Detection\minilm_model') 
 
-  sentence_embed = np.mean(word_embeddings, axis=0)
-  return sentence_embed
 
 #Labels
 def output_label(n):
   if n == 0:
     return 'Fake News'
   elif n == 1:
-    return 'Not Fake News'
+    return 'True News'
   
 #Preprocessing function
 def wordopt(text):
@@ -60,16 +51,25 @@ def check_fact(query):
     scores = cosine_similarity(query, title_vectors)[0]
     top_indices = np.argsort(scores)[::-1][:3]
 
-    # Show results
-    for idx in top_indices:
-        print(f"{scores[idx]:.2f} | {titles[idx]} → {links[idx]}")
+    # Set a threshold
+    threshold = 0.5
+
+    # Get indices of scores above the threshold
+    high_score_indices = [i for i, score in enumerate(scores) if score >= threshold]
+
+    if not high_score_indices:
+       print("No matching articles found!")
+    else:
+      for idx in high_score_indices:
+          print(f"{scores[idx]:.2f} | {titles[idx]} → {links[idx]}")
 
 #FUNCTION FOR PREDICTION
 def prediction_func(news,lr_model):
   query = wordopt(news)
-  query_vec = sentence_embedding(query, glove)
+  query_vec = model.encode(query, convert_to_tensor=True)
   query_vec = np.array(query_vec).reshape(1, -1)
   query_vec=query_vec.tolist()
+  query_vec=scale.transform(query_vec)
   pred_LR = lr_model.predict(query_vec)
   print("LR Prediction: {}".format(output_label(pred_LR[0])))
   
@@ -77,5 +77,5 @@ def prediction_func(news,lr_model):
   matches = check_fact(query_vec)
 
 print("Enter the news to be checked: ")
-news = str("Viral news of Pakistani pilot in indian custody spreading all over the country.")
+news = str("Viral news of Pakistan mercilessly demolishing 6 indian jets.")
 prediction_func(news,classifier)

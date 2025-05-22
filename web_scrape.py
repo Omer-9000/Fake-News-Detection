@@ -15,26 +15,22 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+from sentence_transformers import SentenceTransformer
 import time
 
 
-#Load Glove
-with open(r"Fake-News-Detection\glove_100d.pkl", "rb") as f:
-    glove = pkl.load(f)
+model = SentenceTransformer('Fake-News-Detection\minilm_model')
 
-
-#Embeddings function
-def sentence_embedding(sentence, data_dit,dim=100):
-  words = sentence.lower().split()
-  word_embeddings = []
-  for word in words:
-    if word in data_dit:
-      word_embeddings.append(data_dit[word])
-  if not word_embeddings:
-    return np.zeros(dim)
-
-  sentence_embed = np.mean(word_embeddings, axis=0)
-  return sentence_embed
+def wordopt(text):
+  text = str(text).lower()
+  text = re.sub(r'\[.*?\]', '', text)
+  text = re.sub(r'https?://\S+|www\.\S+', '', text)
+  text = re.sub(r'<.*?>', '', text)
+  text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text) 
+  text = re.sub(r'\n', ' ', text) 
+  text = re.sub(r'\w*\d\w*', '', text) 
+  text = re.sub(r'\s+', ' ', text).strip() 
+  return text
 
 
 driver = webdriver.Chrome()
@@ -45,7 +41,7 @@ load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_m
 while load_more_button:
   ActionChains(driver).move_to_element(load_more_button).perform()
   load_more_button.click()
-  time.sleep(2)
+  time.sleep(10)
   try:
     load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
   except:
@@ -65,7 +61,7 @@ with open(r"Fake-News-Detection\geo_articles.csv", "w", newline='', encoding="ut
     for article in articles:
       a_tag = article.find(class_="text-body")
       title = a_tag.find("img")
-      title=title['alt']
+      title=wordopt(title['alt'])
       link = a_tag['href']
       writer.writerow([title, link])
 
@@ -81,10 +77,11 @@ with open(r"Fake-News-Detection\geo_articles.csv", newline='', encoding='utf-8')
         titles.append(row["title"])
         links.append(row["link"])
 
-title_vectors = [sentence_embedding(title, glove) for title in titles]
+embeddings = model.encode(titles, convert_to_tensor=True)
+embeddings=embeddings.tolist()
 
 # Save for later use
-with open("Fake-News-Detection\glove_title_vectors.pkl", "wb") as f:
-    pkl.dump((titles, links, title_vectors), f)
+with open("Fake-News-Detection\news_vectors.pkl", "wb") as f:
+    pkl.dump((titles, links, embeddings), f)
 
 

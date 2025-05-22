@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score,precision_score,recall_score,f1_score
 from sklearn.metrics import classification_report
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 import re
 import string
@@ -14,20 +16,12 @@ import requests
 from difflib import SequenceMatcher
 from joblib import dump
 import pickle as pkl
+from sentence_transformers import SentenceTransformer
 
 
-#Open Glove file
-with open("Fake-News-Detection\glove.6B.100d.txt") as file:
-    data = file.readlines()
+model = SentenceTransformer('all-MiniLM-L6-v2')
+model.save('Fake-News-Detection\minilm_model')
 
-#Convert Embeddings to a dictionary
-data_dict = dict()
-for i in range(len(data)):
-    split_data = data[i].split()
-    try:
-      data_dict[split_data[0]] = np.array(split_data[1:]).astype('float64')
-    except:
-      pass
 
 #Dataset
 data=pd.read_csv('news_dataset.csv')
@@ -48,19 +42,6 @@ def wordopt(text):
   text = re.sub(r'\s+', ' ', text).strip() 
   return text
 
-#Embeddings function
-def sentence_embedding(sentence, data_dit):
-  words = sentence.lower().split()
-  word_embeddings = []
-  for word in words:
-    if word in data_dit:
-      word_embeddings.append(data_dit[word])
-  if not word_embeddings:
-    return None
-
-  sentence_embed = np.mean(word_embeddings, axis=0)
-  return sentence_embed
-
 
 data['Text'] = data['Text'].apply(wordopt)
 
@@ -72,16 +53,14 @@ news=np.array(news)
 news=news.tolist()
 
 #Convert the whole dataset to embeddings
-x=[]
-for n in news:
-  vector=sentence_embedding(n,data_dict)
-  if vector is not None:
-        x.append(vector.tolist())
-  else:
-    x.append([0.0] * 100)
+embeddings = model.encode(news, convert_to_tensor=True)
+embeddings=embeddings.tolist()
 
+xv_train,xv_test,y_train,y_test = train_test_split(embeddings, y, test_size=0.2,random_state=42)
 
-xv_train,xv_test,y_train,y_test = train_test_split(x, y, test_size=0.2,random_state=42)
+scaler = StandardScaler()
+xv_train = scaler.fit_transform(xv_train)
+xv_test = scaler.transform(xv_test)
 
 #LOGISTIC REGRESSION
 LR = LogisticRegression()
@@ -89,9 +68,14 @@ LR.fit(xv_train,y_train)
 
 pred_lr = LR.predict(xv_test)
 lr_accuracy=accuracy_score(y_test,pred_lr)
+lr_precision=precision_score(y_test,pred_lr)
+lr_recall=recall_score(y_test,pred_lr)
+lr_f1=f1_score(y_test,pred_lr)
 
-print(classification_report(y_test, pred_lr))
 print(f"Accuracy for LR model: {lr_accuracy}")
+print(f"Precision for LR model: {lr_precision}")
+print(f"Recall for LR model: {lr_recall}")
+print(f"F1-score for LR model: {lr_f1}")
 
 
 #DECISION TREES
@@ -99,17 +83,14 @@ DT = DecisionTreeClassifier()
 DT.fit(xv_train,y_train)
 pred_dt = DT.predict(xv_test)
 dt_accuracy=accuracy_score(y_test,pred_dt)
+dt_precision=precision_score(y_test,pred_dt)
+dt_recall=recall_score(y_test,pred_dt)
+dt_f1=f1_score(y_test,pred_dt)
 
 print(f"Accuracy for DT model: {dt_accuracy}")
-
-
-#GRADIENT BOOSTING
-GB = GradientBoostingClassifier(random_state = 0)
-GB.fit(xv_train,y_train)
-predict_gb = GB.predict(xv_test)
-gb_accuracy=accuracy_score(y_test,predict_gb)
-
-print(f"Accuracy for GB model: {gb_accuracy}")
+print(f"Precision for DT model: {dt_precision}")
+print(f"Recall for DT model: {dt_recall}")
+print(f"F1-score for DT model: {dt_f1}")
 
 
 #RANDOM FOREST
@@ -117,13 +98,34 @@ RF = RandomForestClassifier(random_state = 0)
 RF.fit(xv_train,y_train)
 predict_rf = RF.predict(xv_test)
 rf_accuracy=accuracy_score(y_test,predict_rf)
+rf_precision=precision_score(y_test,predict_rf)
+rf_recall=recall_score(y_test,predict_rf)
+rf_f1=f1_score(y_test,predict_rf)
 
 print(f"Accuracy for RF model: {rf_accuracy}")
+print(f"Precision for RF model: {rf_precision}")
+print(f"Recall for RF model: {rf_recall}")
+print(f"F1-score for RF model: {rf_f1}")
+
+
+#SVM
+svc_model = SVC(kernel='linear', C=1.0)
+svc_model.fit(xv_train,y_train)
+pred_svc = svc_model.predict(xv_test)
+svc_accuracy=accuracy_score(y_test,pred_svc)
+svc_precision=precision_score(y_test,pred_svc)
+svc_recall=recall_score(y_test,pred_svc)
+svc_f1=f1_score(y_test,pred_svc)
+
+print(f"Accuracy for SVC model: {svc_accuracy}")
+print(f"Precision for SVC model: {svc_precision}")
+print(f"Recall for SVC model: {svc_recall}")
+print(f"F1-score for SVC model: {svc_f1}")
 
 
 #Save logistic regression model
-dump(LR,"classifier_mod.pkl")
+dump(LR,"classifier_log.pkl")
 
-# Save as pickle file
-with open(r"Fake-News-Detection\glove_100d.pkl", "wb") as f:
-    pkl.dump(data_dict, f)
+#Save scaler
+dump(scaler,"scaler.pkl")
+
