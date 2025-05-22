@@ -55,7 +55,7 @@ print(len(articles))
 
 
 #Saving the news and links in csv file
-with open(r"Fake-News-Detection\geo_articles.csv", "w", newline='', encoding="utf-8") as file:
+with open(r"geo_articles.csv", "w", newline='', encoding="utf-8") as file:
     writer = csv.writer(file)
     writer.writerow(["title", "link"])
     for article in articles:
@@ -71,7 +71,7 @@ print("Saved articles to geo_articles.csv")
 #Loading the csv file
 titles=[]
 links=[]
-with open(r"Fake-News-Detection\geo_articles.csv", newline='', encoding='utf-8') as f:
+with open(r"geo_articles.csv", newline='', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in reader:
         titles.append(row["title"])
@@ -81,7 +81,7 @@ embeddings = model.encode(titles, convert_to_tensor=True)
 embeddings=embeddings.tolist()
 
 # Save for later use
-with open("Fake-News-Detection\news_vectors.pkl", "wb") as f:
+with open("news_vectors.pkl", "wb") as f:
     pkl.dump((titles, links, embeddings), f)
 
 
