@@ -5,7 +5,6 @@ import re
 import string
 from bs4 import BeautifulSoup
 import requests
-from difflib import SequenceMatcher
 from joblib import load
 import pickle as pkl
 import time
@@ -21,18 +20,7 @@ import time
 
 model = SentenceTransformer('Fake-News-Detection\minilm_model')
 
-def wordopt(text):
-  text = str(text).lower()
-  text = re.sub(r'\[.*?\]', '', text)
-  text = re.sub(r'https?://\S+|www\.\S+', '', text)
-  text = re.sub(r'<.*?>', '', text)
-  text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text) 
-  text = re.sub(r'\n', ' ', text) 
-  text = re.sub(r'\w*\d\w*', '', text) 
-  text = re.sub(r'\s+', ' ', text).strip() 
-  return text
-
-
+#WEB SCRAPING
 driver = webdriver.Chrome()
 driver.get("https://www.geo.tv/category/geo-fact-check")
 wait = WebDriverWait(driver, 10)
@@ -41,7 +29,7 @@ load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_m
 while load_more_button:
   ActionChains(driver).move_to_element(load_more_button).perform()
   load_more_button.click()
-  time.sleep(10)
+  time.sleep(5)
   try:
     load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "load_more_fact_news")))
   except:
@@ -61,7 +49,7 @@ with open(r"geo_articles.csv", "w", newline='', encoding="utf-8") as file:
     for article in articles:
       a_tag = article.find(class_="text-body")
       title = a_tag.find("img")
-      title=wordopt(title['alt'])
+      title=title['alt']
       link = a_tag['href']
       writer.writerow([title, link])
 
@@ -80,7 +68,7 @@ with open(r"geo_articles.csv", newline='', encoding='utf-8') as f:
 embeddings = model.encode(titles, convert_to_tensor=True)
 embeddings=embeddings.tolist()
 
-# Save for later use
+#Save vectors for later use
 with open("news_vectors.pkl", "wb") as f:
     pkl.dump((titles, links, embeddings), f)
 

@@ -13,17 +13,17 @@ from sentence_transformers import SentenceTransformer
 
 
 #Loading classifier
-classifier=load(r'classifier_log.pkl')
+classifier=load(r'Fake-News-Detection\classifier_log.pkl')
 
 #Loading scaler
-scale=load(r'scaler.pkl')
+scale=load(r'Fake-News-Detection\scaler.pkl')
 
-#Load geo fact check articles embeddings
-with open(r"news_vectors.pkl", "rb") as f:
+#Loading geo fact check articles embeddings
+with open(r"Fake-News-Detection\news_vectors.pkl", "rb") as f:
     titles, links, title_vectors = pkl.load(f)
 
 
-model = SentenceTransformer('minilm_model') 
+model = SentenceTransformer('Fake-News-Detection\minilm_model') 
 
 
 #Labels
@@ -33,54 +33,35 @@ def output_label(n):
   elif n == 1:
     return 'True News'
   
-#Preprocessing function
-def wordopt(text):
-  text = str(text).lower()
-  text = re.sub(r'\[.*?\]', '', text)
-  text = re.sub(r'https?://\S+|www\.\S+', '', text)
-  text = re.sub(r'<.*?>', '', text)
-  text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text) 
-  text = re.sub(r'\n', ' ', text) 
-  text = re.sub(r'\w*\d\w*', '', text) 
-  text = re.sub(r'\s+', ' ', text).strip() 
-  return text
 
-#WEB SCRAPING
+#FIND SIMILAR ARTICLES
 def check_fact(query,model,scaler):
-    query = wordopt(news)
     query_vec = model.encode(query, convert_to_tensor=True)
     query_vec = np.array(query_vec).reshape(1, -1)
     query_vec=query_vec.tolist()
 
-    # Set a threshold
+    #Set a threshold
     threshold = 0.5
-
-    # Compare with cosine similarity
+    #Compare with cosine similarity
     scores = cosine_similarity(query_vec, title_vectors)[0]
+    #Pair each score with its original index
+    indexed_scores = list(enumerate(scores))
 
-    # Get indices of scores above the threshold
-    high_score_indices = [i for i, score in enumerate(scores) if score >= threshold]
-    high_score_indices=high_score_indices[:3]
-    index=[]
-    if not high_score_indices:
-       return None
-    else:
-      for idx in high_score_indices:
-          index.append((scores[idx], titles[idx], links[idx]))
-    return index
+    #Sort the (index, score) pairs by score in descending order
+    sorted_indexed_scores = sorted(indexed_scores, key=lambda x: x[1], reverse=True)
+
+    #Filter top scores above threshold
+    high_score_results = [(score, titles[i], links[i]) for i, score in sorted_indexed_scores if score >= threshold]
+
+    #Return top 3 results
+    return high_score_results[:3] if high_score_results else None
 
 #FUNCTION FOR PREDICTION
-def prediction_func(news,lr_model,model,scaler):
-  query = wordopt(news)
+def prediction_func(q,lr_model,model,scaler):
+  query = q
   query_vec = model.encode(query, convert_to_tensor=True)
   query_vec = np.array(query_vec).reshape(1, -1)
   query_vec=query_vec.tolist()
   query_vec=scaler.transform(query_vec)
   pred_LR = lr_model.predict(query_vec)
   return pred_LR[0]  
-
-print("Enter the news to be checked: ")
-news = str("Viral clips of radiation leaks in Pakistan")
-prediction_func(news,classifier,model,scale)
-resu=check_fact(news,model,scale)
-print(resu)

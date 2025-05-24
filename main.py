@@ -13,7 +13,6 @@ import re
 import string
 from bs4 import BeautifulSoup
 import requests
-from difflib import SequenceMatcher
 from joblib import dump
 import pickle as pkl
 from sentence_transformers import SentenceTransformer
@@ -29,21 +28,6 @@ data.dropna(inplace=True)
 
 print(data.shape)
 print(data.head())
-
-#Preprocessing function
-def wordopt(text):
-  text = str(text).lower()
-  text = re.sub(r'\[.*?\]', '', text)
-  text = re.sub(r'https?://\S+|www\.\S+', '', text)
-  text = re.sub(r'<.*?>', '', text)
-  text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text) 
-  text = re.sub(r'\n', ' ', text) 
-  text = re.sub(r'\w*\d\w*', '', text) 
-  text = re.sub(r'\s+', ' ', text).strip() 
-  return text
-
-
-data['Text'] = data['Text'].apply(wordopt)
 
 news = data['Text']
 y = data['label']
@@ -123,9 +107,9 @@ print(f"Recall for SVC model: {svc_recall}")
 print(f"F1-score for SVC model: {svc_f1}")
 
 
-#Save logistic regression model
+#Saving logistic regression model
 dump(LR,"classifier_log.pkl")
 
-#Save scaler
+#Saving scaler
 dump(scaler,"scaler.pkl")
 

@@ -9,13 +9,13 @@ from sentence_transformers import SentenceTransformer
 from prediction import prediction_func, check_fact, output_label
 
 
-model = SentenceTransformer('minilm_model') 
+model = SentenceTransformer(r'Fake-News-Detection\minilm_model') 
 
 # Load classifier
-classifier = load("C:\\Users\\AK\\Documents\\Fake-News-Detection\\classifier_log.pkl")
+classifier = load("Fake-News-Detection\classifier_log.pkl")
 
 # Load scaler
-scale = load("C:\\Users\\AK\\Documents\\Fake-News-Detection\\scaler.pkl")
+scale = load("Fake-News-Detection\scaler.pkl")
 
 # Streamlit UI
 st.set_page_config(page_title="Fake News Detector", page_icon="", layout="centered")
@@ -42,6 +42,7 @@ st.markdown("""
     .subtitle {
         text-align: center;
         font-size: 1.2rem;
+        font-weight: 600;
         color: #d1d5db;
         margin-bottom: 2rem;
     }
@@ -96,18 +97,18 @@ if st.button("🚀 Check Now"):
     else:
         st.subheader(" Prediction:")
         prediction = output_label(prediction_func(user_input, classifier, model, scale))
-        if prediction.lower() == "real":
+        if prediction == "True News":
             st.success(" This news appears to be **REAL**.")
         else:
             st.error(" This news appears to be **FAKE**.")
 
-            st.subheader("🔗 For Furthur Information:")
-            results = check_fact(user_input, model, scale)
-            if results:
-                with st.expander("Related fact-checking results"):
-                    for score, title, link in results:
-                        st.markdown(f"- [{title}]({link})  \n  _Similarity Score: {score:.2f}_")
-            else:
-                st.info("No related fact-checks found.")
+        st.subheader("🔗 For Further Information:")
+        results = check_fact(user_input, model, scale)
+        if results:
+            with st.expander("Related fact-checking results"):
+                for score, title, link in results:
+                    st.markdown(f"- [{title}]({link})  \n  _Similarity Score: {score:.2f}_")
+        else:
+            st.info("No related fact-checks found.")
         st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
