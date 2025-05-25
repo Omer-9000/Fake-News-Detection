@@ -1,0 +1,20 @@
+Libraries:
+
+streamlit
+sentence-transformers
+scikit-learn
+numpy
+pandas
+beautifulsoup4
+selenium
+requests
+matplotlib
+torch
+regex
+
+
+How to run:
+
+1. Clone the repository
+2. Change the directories of the files loaded in the code according to your own file paths.
+3. Run the command: "streamlit run app.py" to launch the app
